@@ -5,6 +5,12 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 
+
+//The State monad is a generalization of the reader monad in the sense that each step can modify the current
+//state before the next step is called. As a referentially transparent language cannot have
+//a shared global state, the trick is to encapsulate the state inside the monad and pass
+//it explicitly to each part of the sequence.
+
 trait ComputationState
 
 object Ready extends ComputationState
@@ -26,24 +32,21 @@ object StateMoandExample extends App {
   }
 
   val d = StateT[Future, ComputationState, String] { state =>
-    Future {
-      (End, s"The state is $state")
-    }
+    Future(End, s"The state is $state")
   }
 
-  val r: StateT[Future, ComputationState, (String, String, String)] = for {
+  val r: StateT[Future, ComputationState, (String)] = for {
     x <- b
     y <- c
     z <- d
-  } yield (x, y, z)
+  } yield z
 
-  val g: Future[Any] = r.run(Ready)
+  val g: Future[(ComputationState, String)] = r.run(Ready)
     .recover {
-      case e => println(e)
+      case e => throw e
     }
 
-  val t = Await.ready(g, Duration.Inf)
+  val t = Await.result(g, Duration.Inf)
   println(t)
-
-  //Future(Success((End$@2ac273d3,(The state is Ready$@2eb6560b,The state is Start$@465e0a4c,The state is Ran$@50663384))))
+  //(End$@4e1d422d,The state is Ran$@6b96c50a)
 }
